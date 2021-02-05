@@ -1,22 +1,31 @@
 import sys
 import math
 import heapq
+import time 
+import os
 
 col_isto_size = {}
 col_index = {}
 heap = []
 
-order_flag=True
-sort_acc_to_cols = []
+# order_flag=True
+# sort_acc_to_cols = []
 
 class HeapNode:
+    sort_col = []
+    sort_order = None
     def __init__(self):
         self.data = []
         self.file_ptr = 0
 
+
     def __lt__(self, other):
-        # print ("in lt: ")
-        return compare(self.data, other.data, sort_acc_to_cols, order_flag)
+        return compare(self.data, other.data, HeapNode.sort_col, HeapNode.sort_order)
+
+def delete_temp_files(temp_filenames):
+    for filename in temp_filenames:
+        os.remove(filename)
+
 
 def checkRec(temp_filenames):
     n = len(temp_filenames)
@@ -28,34 +37,34 @@ def checkRec(temp_filenames):
     return res_len
 
 def compare(l1,l2,columns,flag):
-    # print("in compare method")
-	if(flag):
-		for j in columns:
-			i=col_index[j]
-			if(l1[i]>l2[i]):
-				return True
-			elif(l1[i]==l2[i]):
-				continue
-			else:
-				return False
-		return False
-	else:
-		for j in columns:
-			i=col_index[j]
-			if(l1[i]<l2[i]):
-				return True
-			elif(l1[i]==l2[i]):
-				continue
-			else:
-				return False
-		return False
+    if(flag):
+        for j in columns:
+            i=col_index[j]
+            if(l1[i]>l2[i]):
+                return True
+            elif(l1[i]==l2[i]):
+                continue
+            else:
+                return False
+        return False
+    else:
+        for j in columns:
+            i=col_index[j]
+            if(l1[i]<l2[i]):
+                return True
+            elif(l1[i]==l2[i]):
+                continue
+            else:
+                return False
+        return False
 
 
 def mergeFiles(temp_filenames, output_file, sort_acc_to_cols, order_flag):
     filepointer=[None]*len(temp_filenames)
+    HeapNode.sort_col = sort_acc_to_cols
+    HeapNode.sort_order = order_flag
     for i in range(len(temp_filenames)):
         filepointer[i]=open(temp_filenames[i])
-        # data=readoneline(filepointer[i])
         line = filepointer[i].readline()
         if line :
             data = split_line(line)
@@ -65,23 +74,15 @@ def mergeFiles(temp_filenames, output_file, sort_acc_to_cols, order_flag):
         temp.file_ptr=i
         temp.data=data
         heap.append(temp)
-    
-    if order_flag:
-        heapq._heapify_max(heap)
-    else:
-        heapq.heapify(heap)
+
+    heapq.heapify(heap)
 
     opFilePtr = open(output_file, 'w')
     num_tempFiles = len(temp_filenames)
     fileRead=0
     num_records=0
-    print ("initial heap done")
     while(fileRead!=num_tempFiles):
-        if order_flag==True:
-            top = heapq._heappop_max(heap)
-        else:
-            top = heapq.heappop(heap)
-        
+        top = heapq.heappop(heap)
         final_data = []
         final_data.append(top.data)
         writeToFile(opFilePtr, final_data)
@@ -94,14 +95,10 @@ def mergeFiles(temp_filenames, output_file, sort_acc_to_cols, order_flag):
         
         if(len(new_data)!=0):
             top.data = new_data
-            # temp.file_
             heap.append(top)
-            if order_flag:
-                heapq._heapify_max(heap)
-            else:
-                heapq.heapify(heap)
+            heapq.heapify(heap)
         else:
-            print("file read : ", fileRead)
+            # print("file read : ", fileRead)
             fileRead+=1
     
     print("all files done : ", num_records)
@@ -109,19 +106,16 @@ def mergeFiles(temp_filenames, output_file, sort_acc_to_cols, order_flag):
          filepointer[i].close()
     
     opFilePtr.close()
-    print("returning :")
     return         
 
 
 def writeToFile(fptr, data):
     for line in data:
-        # print ("line : ", line)
         temp=""
         for word in line:
             temp += (word + "  ")
         temp = temp[:-2]
-        temp+="\n"
-        # print ("line to write : ", temp)
+        temp+="\r\n"
         fptr.write(temp)
         
 
@@ -164,12 +158,10 @@ def split_sort_storefile(input_file, order_flag, chunksize, sort_acc_to_cols):
 
         if(num_lines==chunksize):
             temp_filename = str(tempfile_index)+'.txt'
-            print ("Creating temp file : ", temp_filename)
+            # print ("Creating temp file : ", temp_filename)
             temp_filenames.append(temp_filename)
             tempfile = open(temp_filename, 'w')
-            print("temp data before sort : ", temp_data[0])
             sorted_tempdata = getSortedData(temp_data, order_flag, sort_acc_to_cols)
-            print("temp data after sort :  ", sorted_tempdata[0])
             writeToFile(tempfile, sorted_tempdata)
             temp_data= []
             tempfile_index+=1
@@ -178,7 +170,7 @@ def split_sort_storefile(input_file, order_flag, chunksize, sort_acc_to_cols):
 
     if(num_lines > 0):
         temp_filename = str(tempfile_index)+'.txt'
-        print ("Creating temp file : ", temp_filename)
+        # print ("Creating temp file : ", temp_filename)
         temp_filenames.append(temp_filename)
         tempfile = open(temp_filename, 'w')
         sorted_tempdata = getSortedData(temp_data, order_flag, sort_acc_to_cols)
@@ -217,7 +209,7 @@ def read_metadata(metadata_filename):
 def parseInput(sys_args):
     input_file = sys_args[1]
     output_file = sys_args[2]
-    mm_size = int(sys_args[3])*1024*1024
+    mm_size = int(sys_args[3])*1000*1000
     num_thread = int(sys_args[4])
     order = sys_args[5]
     if(order=="desc"):
@@ -235,6 +227,7 @@ def parseInput(sys_args):
     return input_file, output_file, mm_size, num_thread, order_flag, col_to_sort
 
 def main():
+    start_time = time.time()
     sys_args = sys.argv
     len_args = len(sys_args)
     metadata_filename = "metadata.txt"
@@ -242,36 +235,38 @@ def main():
         print ("Incomplete command")
     else:
         input_file, output_file, mm_size, num_thread, order_flag, sort_acc_to_cols = parseInput(sys_args)
+        # print ("sort acc to col : ,", sort_acc_to_cols)
         read_metadata(metadata_filename)
         total_no_records = getTotalNumOfRecords(input_file)
-        print ("total num of records : ", total_no_records)
+        # print ("total num of records : ", total_no_records)
         tuple_size = getTupleSize()
-        print ("tuple_size : ", tuple_size)
+        # print ("tuple_size : ", tuple_size)
         # chunksize = num of records in one chunk
         chunk_size = math.floor(mm_size/tuple_size)
-        print ("total num of temp files : ", math.ceil(total_no_records/chunk_size))
-        print ("chunk size : ", chunk_size)
-        print ("col_isto_size : ", col_isto_size)
-        print ("col_index : ", col_index)
+        # print ("total num of temp files : ", math.ceil(total_no_records/chunk_size))
+        # print ("chunk size : ", chunk_size)
+        # print ("col_isto_size : ", col_isto_size)
+        # print ("col_index : ", col_index)
 
         temp_filenames = split_sort_storefile(input_file, order_flag, chunk_size, sort_acc_to_cols)
-        print("temp files list : ", temp_filenames)
+        # print("temp files list : ", temp_filenames)
 
         res_len = checkRec(temp_filenames)
-        print ("mnum of rec in each dfile : ", res_len)
-        print ("total : ", sum(res_len))
+        # print ("mnum of rec in each dfile : ", res_len)
+        # print ("total : ", sum(res_len))
 
         
         mergeFiles(temp_filenames, output_file, sort_acc_to_cols, order_flag)
 
         fileop = open(output_file)
         lines = fileop.readlines()
-        print ("num of records in op file : ", len(lines))
+        # print ("num of records in op file : ", len(lines))
         fileop.close()
-        print (total_no_records*tuple_size/(1024*1024))
+        # print (total_no_records*tuple_size/(1024*1024))
+        delete_temp_files(temp_filenames)
+        print ("time taken : ", time.time()-start_time)
 
 main()
 
-# command : python trial_1.py input.txt output.txt 100 5 desc A B
-# python q1.py input.txt output.txt 100 5 dsc A B
+# command : python phase-1_0.py input.txt output.txt 100 5 desc A B
 
